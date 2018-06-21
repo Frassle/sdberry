@@ -197,13 +197,16 @@ int main(int argc, char **argv)
 	pullUpDnControl(21, PUD_DOWN);
 	pullUpDnControl(26, PUD_UP);
 
-	uint64_t word = 0;
+	// clock
 	int high = 0;
+	int hz = 0;
+	int begin = -1;
+
+	// cmd
+	uint64_t word = 0;
 	int bits = 0;
 	int start = 0;
 
-	int hz = 0;
-	int begin = -1;
 
 	while (1) {
 		int clk = digitalRead(21);
@@ -214,16 +217,25 @@ int main(int argc, char **argv)
 			high = 1;
 
 			int cmd = digitalRead(20);
-			word <<= 1;
-			word |= cmd;
-			++bits;
+			if (start) {
+				word <<= 1;
+				word |= cmd;
+				++bits;
 
-			if(bits == 48) {
-				printf("%#llx\n", word);
-				word = 0;
-				bits = 0;
-				break;
+				if(bits == 48) {
+					printf("%#llx\n", word);
+					word = 0;
+					bits = 0;
+					break;
+				}
+			} else {
+				if (cmd == 0) {
+					start = 1;
+					word = 0;
+					bits = 1;
+				}
 			}
+
 		} else if (high && !clk) {
 			high = 0;
 		}
