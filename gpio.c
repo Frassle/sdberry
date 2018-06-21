@@ -20,15 +20,6 @@ void *gpio_map;
 // I/O access
 volatile unsigned *gpio;
 
-// gpioToGPLEV:
-//      (Word) offset to the GPIO Input level registers for each GPIO pin
-
-static uint8_t gpioToGPLEV [] =
-{
-	13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,
-	14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,
-};
-
 //
 // Set up a memory regions to access GPIO
 //
@@ -60,8 +51,88 @@ void setup_io()
 	gpio = (volatile unsigned *)gpio_map;
 }
 
+// gpioToGPFSEL:
+//      Map a BCM_GPIO pin to it's Function Selection
+//      control port. (GPFSEL 0-5)
+//      Groups of 10 - 3 bits per Function - 30 bits per port
+
+static uint8_t gpioToGPFSEL [] =
+{
+	0,0,0,0,0,0,0,0,0,0,
+	1,1,1,1,1,1,1,1,1,1,
+	2,2,2,2,2,2,2,2,2,2,
+	3,3,3,3,3,3,3,3,3,3,
+	4,4,4,4,4,4,4,4,4,4,
+	5,5,5,5,5,5,5,5,5,5,
+};
+
+// gpioToShift
+//      Define the shift up for the 3 bits per pin in each GPFSEL port
+
+static uint8_t gpioToShift [] =
+{
+	0,3,6,9,12,15,18,21,24,27,
+	0,3,6,9,12,15,18,21,24,27,
+	0,3,6,9,12,15,18,21,24,27,
+	0,3,6,9,12,15,18,21,24,27,
+	0,3,6,9,12,15,18,21,24,27,
+	0,3,6,9,12,15,18,21,24,27,
+};
+
+// gpioToGPSET:
+//      (Word) offset to the GPIO Set registers for each GPIO pin
+
+static uint8_t gpioToGPSET [] =
+{
+	7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+	8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
+};
+
+// gpioToGPCLR:
+//      (Word) offset to the GPIO Clear registers for each GPIO pin
+
+static uint8_t gpioToGPCLR [] =
+{
+	10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,
+	11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,
+};
+
+// gpioToGPLEV:
+//      (Word) offset to the GPIO Input level registers for each GPIO pin
+
+static uint8_t gpioToGPLEV [] =
+{
+	13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,
+	14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,
+};
+
+#define	INPUT			 0
+#define	OUTPUT			 1
+
+void pinMode (int pin, int mode) {
+	int fSel    = gpioToGPFSEL [pin] ;
+	int shift   = gpioToShift  [pin] ;
+	
+	if (mode == INPUT) {
+		*(gpio + fSel) = (*(gpio + fSel) & ~(7 << shift)); // Sets bits to zero = input
+	} else if (mode == OUTPUT) {
+		*(gpio + fSel) = (*(gpio + fSel) & ~(7 << shift)) | (1 << shift);
+	}
+}
+
 int digitalRead(int pin) {
 	return ((*(gpio + gpioToGPLEV [pin]) & (1 << (pin & 31))) != 0);
+}
+
+#define	LOW			 0
+#define	HIGH			 1
+
+void digitalWrite(int pin, int value) {
+	if (value == LOW) {
+		*(gpio + gpioToGPCLR [pin]) = 1 << (pin & 31) ;
+	} else {
+		*(gpio + gpioToGPSET [pin]) = 1 << (pin & 31) ;
+	}
 }
 
 // GPPUD:
@@ -89,6 +160,11 @@ void pullUpDnControl (int pin, int pud) {
 	*(gpio + gpioToPUDCLK [pin]) = 0 ;                  delayMicroseconds (5) ;
 }
 
+// gpio 35 / bcm 19 / pin 7 / strand 12 = miso | data0 
+// gpio 38 / bcm 20 / pin 3 / strand 6  = mosi | cmd/res 
+// gpio 40 / bcm 21 / pin 5 / strand 10 = sclk
+// gpio 37 / bcm 26 / pin 2 / strand 4  = card select/detection
+
 int main(int argc, char **argv)
 {
 	printf ("Raspberry Pi SD Card\n") ;
@@ -96,19 +172,28 @@ int main(int argc, char **argv)
 
 	setup_io();
 
-	pullUpDnControl(21, PUD_DOWN);
+	pinMode(19, OUTPUT);
+	pinMode(20, INPUT);
+	pinMode(21, INPUT);
+	pinMode(26, INPUT);
+
+	digitalWrite(19, LOW);
 	pullUpDnControl(20, PUD_DOWN);
+	pullUpDnControl(21, PUD_DOWN);
+	pullUpDnControl(26, PUD_UP);
 
 	uint64_t word = 0;
 	int high = 0;
 	int bits = 0;
 	int start = 0;
 
+	int hz = 0;
 	int begin = -1;
 
 	while (1) {
 		int clk = digitalRead(21);
 		if (!high && clk) {
+			++hz;
 			if (begin == -1) { begin = micros(); }
 			int cmd = digitalRead(20);
 			word |= cmd;
@@ -117,6 +202,10 @@ int main(int argc, char **argv)
 			high = 1;
 
 			if(bits == 48) {
+				if (word & 0xFFFFFFFFFFFF != 0) {
+					printf("word has high bits set!\n");
+				}
+
 				printf("%#llx\n", word);
 				word = 0;
 				bits = 0;
@@ -127,8 +216,16 @@ int main(int argc, char **argv)
 		}
 	}
 
-	int time = micros() - begin;
-	printf("%d\n", time);
+	if (begin == -1) {
+		printf("No high clocks\n");
+	} else {
+		int time = micros() - begin;
+		printf("%dus\n", time);
+		printf("%dms\n", time / 1000);
+	}
+
+	printf("%dhz\n", hz);
+	printf("%dkhz\n", hz / 1000);
 
 	return 0;
 
