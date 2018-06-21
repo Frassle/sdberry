@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <time.h>
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <unistd.h>
@@ -19,6 +20,20 @@ void *gpio_map;
 
 // I/O access
 volatile unsigned *gpio;
+
+/*
+ * micros:
+ *      Return a number of microseconds as an unsigned int.
+ *      Wraps after 71 minutes.
+ *********************************************************************************
+ */
+unsigned int micros (void)
+{
+  struct timespec ts ;
+  clock_gettime (CLOCK_MONOTONIC_RAW, &ts) ;
+  uint64_t now  = (uint64_t)ts.tv_sec * (uint64_t)1000000 + (uint64_t)(ts.tv_nsec / 1000) ;
+  return (uint32_t)now;
+}
 
 //
 // Set up a memory regions to access GPIO
