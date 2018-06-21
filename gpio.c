@@ -207,20 +207,18 @@ int main(int argc, char **argv)
 
 	while (1) {
 		int clk = digitalRead(21);
+		int cds = digitalRead(26);
 		if (!high && clk) {
-			++hz;
 			if (begin == -1) { begin = micros(); }
-			int cmd = digitalRead(20);
-			word |= cmd;
-			word <<= 1;
-			++bits;
+			++hz;
 			high = 1;
 
-			if(bits == 48) {
-				if (word & 0xFFFFFFFFFFFF != 0) {
-					printf("word has high bits set!\n");
-				}
+			int cmd = digitalRead(20);
+			word <<= 1;
+			word |= cmd;
+			++bits;
 
+			if(bits == 48) {
 				printf("%#llx\n", word);
 				word = 0;
 				bits = 0;
@@ -231,13 +229,15 @@ int main(int argc, char **argv)
 		}
 	}
 
+	int time = micros() - begin;
 	if (begin == -1) {
 		printf("No high clocks\n");
 	} else {
-		int time = micros() - begin;
 		printf("%dus\n", time);
 		printf("%dms\n", time / 1000);
 	}
+
+	hz = (hz * 1000000) / time;
 
 	printf("%dhz\n", hz);
 	printf("%dkhz\n", hz / 1000);
