@@ -180,10 +180,59 @@ void pullUpDnControl (int pin, int pud) {
 // gpio 40 / bcm 21 / pin 5 / strand 10 = sclk
 // gpio 37 / bcm 26 / pin 2 / strand 4  = card select/detection
 
+uint8_t CRCTable[256];
+ 
+void generateCRCTable()
+{
+	int i, j;
+	uint8_t CRCPoly = 0x89;  // the value of our CRC-7 polynomial
+
+	// generate a table value for all 256 possible byte values
+	for (i = 0; i < 256; ++i) {
+		CRCTable[i] = (i & 0x80) ? i ^ CRCPoly : i;
+		for (j = 1; j < 8; ++j) {
+			CRCTable[i] <<= 1;
+			if (CRCTable[i] & 0x80) {
+			    CRCTable[i] ^= CRCPoly;
+			}
+		}
+	}
+}
+
+uint8_t crc7(uint64_t word) {
+	uint8_t crc = 0;
+	crc = CRCTable[(crc << 1) ^ ((word >> 8 * 5) & 0xFF)];
+	crc = CRCTable[(crc << 1) ^ ((word >> 8 * 4) & 0xFF)];
+	crc = CRCTable[(crc << 1) ^ ((word >> 8 * 3) & 0xFF)];
+	crc = CRCTable[(crc << 1) ^ ((word >> 8 * 2) & 0xFF)];
+	crc = CRCTable[(crc << 1) ^ ((word >> 8 * 1) & 0xFF)];
+	crc = CRCTable[(crc << 1) ^ ((word >> 8 * 0) & 0xFF)];
+	return crc;
+}
+
+int checkcrc(uint64_t word) {
+	uint8_t crc = (word & 0xFF) >> 1;
+	uint64_t message = word >> 8;
+	uint8_t real_crc = crc7(message);
+	if(real_crc!= crc) {
+		printf("Expected crc %x, got crc %x!\n", crc, real_crc);
+		exit(1);
+	}
+}
+
+
 int main(int argc, char **argv)
 {
-	printf ("Raspberry Pi SD Card\n") ;
+	generateCRCTable();
+
+	printf("Raspberry Pi SD Card\n");
 	piHiPri(99);
+
+	printf("Tests\n");
+	printf("CRC7(0x4000000000) == 0x4a\n");
+	printf("%x\n", crc7(0x4000000000));
+	printf("CRC7(0x5100000000) == 0x2a\n");
+	printf("%x\n", crc7(0x5100000000));
 
 	setup_io();
 
@@ -214,6 +263,8 @@ int main(int argc, char **argv)
 		int clk = (gpioreg & (1 << 21)) != 0;
 		int cds = (gpioreg & (1 << 26)) != 0;
 
+		if(!cds) continue;
+
 		if (!high && clk) {
 			if (begin == -1) { begin = micros(); }
 			++hz;
@@ -228,6 +279,7 @@ int main(int argc, char **argv)
 					printf("%#llx\n", word);
 					word = 0;
 					bits = 0;
+					checkcrc(word);
 					break;
 				}
 			} else {
