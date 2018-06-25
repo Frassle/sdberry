@@ -18,42 +18,19 @@ import gpiozero
 
 
 with \
-    gpiozero.InputDevice(21) as sclk, \
-    gpiozero.InputDevice(20) as pinin, \
+    gpiozero.InputDevice(19) as miso, \
+    gpiozero.InputDevice(20) as mosi, \
+    gpiozero.InputDevice(21) as sckl, \
+    gpiozero.InputDevice(26) as cd, \
     gpiozero.OutputDevice(3) as pinout:
 
     pinout.on()
 
-    high = False
-
     while True:
-     #  if int(time.time()) % 2 == 0:
-     #      if not pinout.value:
-     #          print("on")
-     #          pinout.on()
-     #  else:
-     #      if pinout.value:
-     #          print("off")
-     #          pinout.off()
-
-     #  if not high and pinin.value:
-     #      # gone high
-     #      print("Low : " + str(time.time() - edge))
-     #      edge = time.time()
-     #      high = True
-     #  elif high and not pinin.value:
-     #      print("High : " + str(time.time() - edge))
-     #      edge = time.time()
-     #      high = False
-        if not high and sclk.value:
-            high = True
-            if pinin.value:
-                sys.stdout.write("1")
-                sys.stdout.flush()
-            else:
-                sys.stdout.write("0")
-                sys.stdout.flush()
-        elif high and not sclk.value:
-            high = False
-
-     #  time.sleep(0.1)
+        print("miso:mosi:sckl:cd")
+        print("{}   :{}   :{}   :{}".format(
+            1 if miso.value else 0,
+            1 if mosi.value else 0,
+            1 if sckl.value else 0,
+            1 if cd.value else 0))
+        time.sleep(0.5)
