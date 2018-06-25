@@ -199,7 +199,7 @@ int main(int argc, char **argv)
 
 	// clock
 	int high = 0;
-	int hz = 0;
+	uint64_t hz = 0;
 	int begin = -1;
 
 	// cmd
@@ -253,8 +253,8 @@ int main(int argc, char **argv)
 
 	hz = (hz * 1000000) / time;
 
-	printf("%dhz\n", hz);
-	printf("%dkhz\n", hz / 1000);
+	printf("%lluhz\n", hz);
+	printf("%llukhz\n", hz / 1000);
 
 	return 0;
 
