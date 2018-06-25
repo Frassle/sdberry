@@ -209,14 +209,16 @@ int main(int argc, char **argv)
 
 
 	while (1) {
-		int clk = digitalRead(21);
-		int cds = digitalRead(26);
+		int gpioreg = *(gpio + 13);
+		int cmd = (gpioreg & (1 << 20)) != 0;
+		int clk = (gpioreg & (1 << 21)) != 0;
+		int cds = (gpioreg & (1 << 26)) != 0;
+
 		if (!high && clk) {
 			if (begin == -1) { begin = micros(); }
 			++hz;
 			high = 1;
 
-			int cmd = digitalRead(20);
 			if (start) {
 				word <<= 1;
 				word |= cmd;
