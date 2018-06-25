@@ -251,7 +251,7 @@ int main(int argc, char **argv)
 		printf("%dms\n", time / 1000);
 	}
 
-	hz = (hz * 1000000) / time;
+	hz = (uint64_t)((hz * 1000000.0) / time);
 
 	printf("%lluhz\n", hz);
 	printf("%llukhz\n", hz / 1000);
