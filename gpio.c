@@ -216,6 +216,7 @@ int checkcrc(uint64_t word) {
 	uint8_t real_crc = crc7(message);
 	if(real_crc!= crc) {
 		printf("Expected crc %x, got crc %x!\n", crc, real_crc);
+		printf("%#llx\n", word);
 		exit(1);
 	}
 }
@@ -242,8 +243,6 @@ int main(int argc, char **argv)
 	pinMode(26, INPUT);
 
 	digitalWrite(19, LOW);
-	pullUpDnControl(20, PUD_DOWN);
-	pullUpDnControl(21, PUD_DOWN);
 	pullUpDnControl(26, PUD_UP);
 
 	// clock
@@ -256,6 +255,10 @@ int main(int argc, char **argv)
 	int bits = 0;
 	int start = 0;
 
+
+	int state = 0;
+	// 0 == idle
+	// 1 == ready
 
 	while (1) {
 		int gpioreg = *(gpio + 13);
@@ -276,11 +279,49 @@ int main(int argc, char **argv)
 				++bits;
 
 				if(bits == 48) {
-					printf("%#llx\n", word);
+					checkcrc(word);
+
+					int cmdindex = (word >> 40) & 0x3F;
+
+					if (cmdindex == 0) {
+						printf("Got CMD0\n");
+						state = 0;
+					} else if(cmdindex == 1) {
+						printf("Got CMD1\n");
+						state = 1;
+
+						uint64_t r3 = 0x3F40300000FF;
+						pinMode(20, OUTPUT);
+
+						bits = 0;
+						while(bits != 48) { 
+							int gpioreg = *(gpio + 13);
+							int clk = (gpioreg & (1 << 21)) != 0;
+
+							if(!high && clk) { 
+								++hz;
+								high = 1;
+							} else if (high && !clk) {
+								high = 0;
+								int bit = (r3 & 0x800000000000) != 0;
+								r3 <<= 1;
+								++bits;
+								digitalWrite(20, bit);
+							}
+						}
+
+						pinMode(20, INPUT);
+						bits = 0;
+						printf("Sent R3\n");
+					} else {
+						printf("Unknown command!\n");
+						printf("%#llx\n", word);
+						break;
+					}
+
+					start = 0;
 					word = 0;
 					bits = 0;
-					checkcrc(word);
-					break;
 				}
 			} else {
 				if (cmd == 0) {
