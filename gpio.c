@@ -295,15 +295,6 @@ uint64_t send_r(uint64_t response) {
 	return hz;
 }
 
-
-uint64_t send_r3() {
-	uint64_t r3 = 0x3F40300000FF;
-	uint64_t hz = send_r(r3);
-	printf("Sent R3\n");
-	return hz;
-}
-
-
 uint64_t send_r1(int cmdindex) {
 	uint64_t response = (uint64_t)cmdindex << 32;
 	response |= *((uint32_t*)&CSR);
@@ -313,6 +304,27 @@ uint64_t send_r1(int cmdindex) {
 	response |= 1;
 	uint64_t hz = send_r(response);
 	printf("Sent R1 (%#llx)\n", response);
+	return hz;
+}
+
+uint64_t send_r3() {
+	uint64_t r3 = 0x3F40300000FF;
+	uint64_t hz = send_r(r3);
+	printf("Sent R3\n");
+	return hz;
+}
+
+uint64_t send_r7(uint32_t voltage, uint32_t pattern) {
+	// 1001000000000000000000000000000 == 0x48000000
+	uint64_t response = 0x48000000;
+	response |= (voltage << 8);
+	response |= pattern;
+	uint8_t crc = crc7(response);
+	response <<= 8;
+	response |= (crc << 1);
+	response |= 1;
+	uint64_t hz = send_r(response);
+	printf("Sent R7 (%#llx)\n", response);
 	return hz;
 }
 
@@ -396,9 +408,15 @@ int main(int argc, char **argv)
 						hz += send_r3();
 					} else if (cmdindex == 8) {
 						printf("Got CMD8 (SEND_IF_COND)\n");
-						uint64_t args = (word >> 8) & 0xFFFFFFFF;
-						printf("args = %#llx\n", args);
-						printf("Ignore, don't reply.\n");
+						uint64_t voltage = (word >> 16) & 0xF;
+						uint64_t pattern = (word >> 8) & 0xFF;
+						printf("voltage = %#llx\n", voltage);
+						printf("pattern = %#llx\n", pattern);
+						if (voltage == 1) {
+							hz += send_r7(voltage, pattern);
+						} else {
+							printf("voltage invalid, not responding\n");
+						}
 					} else if (cmdindex == 55) {
 						printf("Got CMD55 (APP_CMD)\n");
 						CSR.APP_CMD = 1;
