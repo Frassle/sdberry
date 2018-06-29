@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
 #include <fcntl.h>
 #include <sys/mman.h>
@@ -175,10 +176,56 @@ void pullUpDnControl (int pin, int pud) {
 	*(gpio + gpioToPUDCLK [pin]) = 0 ;                  delayMicroseconds (5) ;
 }
 
+// gpio 36 / bcm 16 / pin 4 / strand 10 = power
 // gpio 35 / bcm 19 / pin 7 / strand 12 = miso | data0 
 // gpio 38 / bcm 20 / pin 3 / strand 6  = mosi | cmd/res 
 // gpio 40 / bcm 21 / pin 5 / strand 10 = sclk
 // gpio 37 / bcm 26 / pin 2 / strand 4  = card select/detection
+
+// ============================
+// END OF GPIO, START OF SDCARD
+// ============================
+
+// Card status register
+struct {
+	uint32_t OUT_OF_RANGE : 1;
+	uint32_t ADDRESS_ERROR : 1;
+	uint32_t BLOCK_LEN_ERROR : 1;
+	uint32_t ERASE_SEQ_ERROR : 1;
+	uint32_t ERASE_PARAM : 1;
+	uint32_t WP_VIOLATION : 1;
+	uint32_t CARD_IS_LOCKED : 1;
+	uint32_t LOCK_UNLOCK_FAILED : 1;
+       	uint32_t COM_CRC_ERROR : 1;
+	uint32_t ILLEGAL_COMMAND : 1;
+	uint32_t CARD_ECC_FAILED : 1;
+	uint32_t CC_ERROR : 1;
+	uint32_t reserved1 : 1;
+	uint32_t reserved2 : 1;
+	uint32_t CSD_OVERWRITE : 1;
+	uint32_t WP_ERASE_SKIP : 1;
+	uint32_t CARD_ECC_DISABLED : 1;
+	uint32_t ERASE_RESET : 1;
+	// 0 == idle
+	// 1 == ready
+	// 2 == ident
+	// 3 == stby
+	// 4 == tran
+	// 5 == data
+	// 6 == rcv
+	// 7 == prg
+	// 8 == dis
+	// 9-15 == reserved
+	uint32_t CURRENT_STATE : 4;
+	uint32_t READY_FOR_DATA : 1;
+	uint32_t reserved3 : 1;
+	uint32_t FX_EVENT : 1;
+	uint32_t APP_CMD : 1;
+	uint32_t reserved4 : 1;
+	uint32_t AKE_SEQ_ERROR : 1;
+	uint32_t reserved5 : 1;
+	uint32_t reserved6 : 2;
+} CSR;
 
 uint8_t CRCTable[256];
  
@@ -217,10 +264,57 @@ int checkcrc(uint64_t word) {
 	if(real_crc!= crc) {
 		printf("Expected crc %x, got crc %x!\n", crc, real_crc);
 		printf("%#llx\n", word);
-		exit(1);
+		CSR.COM_CRC_ERROR = 1;
+	} else {
+		CSR.COM_CRC_ERROR = 0;
 	}
 }
 
+uint64_t send_r(uint64_t response) {
+	pinMode(20, OUTPUT);
+
+	uint64_t hz = 0;
+	int high = 0;
+	int bits = 0;
+	while(bits != 48) { 
+		int gpioreg = *(gpio + 13);
+		int clk = (gpioreg & (1 << 21)) != 0;
+
+		if(!high && clk) { 
+			++hz;
+			high = 1;
+		} else if (high && !clk) {
+			high = 0;
+			int bit = (response & 0x800000000000) != 0;
+			response <<= 1;
+			++bits;
+			digitalWrite(20, bit);
+		}
+	}
+	pinMode(20, INPUT);
+	return hz;
+}
+
+
+uint64_t send_r3() {
+	uint64_t r3 = 0x3F40300000FF;
+	uint64_t hz = send_r(r3);
+	printf("Sent R3\n");
+	return hz;
+}
+
+
+uint64_t send_r1(int cmdindex) {
+	uint64_t response = (uint64_t)cmdindex << 32;
+	response |= *((uint32_t*)&CSR);
+	uint8_t crc = crc7(response);
+	response <<= 8;
+	response |= (crc << 1);
+	response |= 1;
+	uint64_t hz = send_r(response);
+	printf("Sent R1 (%#llx)\n", response);
+	return hz;
+}
 
 int main(int argc, char **argv)
 {
@@ -230,19 +324,26 @@ int main(int argc, char **argv)
 	piHiPri(99);
 
 	printf("Tests\n");
+	// CMD0
 	printf("CRC7(0x4000000000) == 0x4a\n");
 	printf("%x\n", crc7(0x4000000000));
+
 	printf("CRC7(0x5100000000) == 0x2a\n");
 	printf("%x\n", crc7(0x5100000000));
 
 	setup_io();
 
+	pinMode(16, INPUT);
 	pinMode(19, OUTPUT);
 	pinMode(20, INPUT);
 	pinMode(21, INPUT);
 	pinMode(26, INPUT);
 
 	digitalWrite(19, LOW);
+	pullUpDnControl(16, PUD_DOWN);
+	pullUpDnControl(19, PUD_OFF);
+	pullUpDnControl(20, PUD_OFF);
+	pullUpDnControl(12, PUD_OFF);
 	pullUpDnControl(26, PUD_UP);
 
 	// clock
@@ -255,18 +356,21 @@ int main(int argc, char **argv)
 	int bits = 0;
 	int start = 0;
 
-
-	int state = 0;
-	// 0 == idle
-	// 1 == ready
-
 	while (1) {
 		int gpioreg = *(gpio + 13);
+		int power = (gpioreg & (1 << 16)) != 0;
 		int cmd = (gpioreg & (1 << 20)) != 0;
 		int clk = (gpioreg & (1 << 21)) != 0;
 		int cds = (gpioreg & (1 << 26)) != 0;
 
-		if(!cds) continue;
+		if (!power) {
+			high = 0;
+			word = 0;
+			bits = 0;
+			start = 0;
+			memset(&CSR, sizeof(CSR), 0);
+			continue;
+		}
 
 		if (!high && clk) {
 			if (begin == -1) { begin = micros(); }
@@ -284,35 +388,21 @@ int main(int argc, char **argv)
 					int cmdindex = (word >> 40) & 0x3F;
 
 					if (cmdindex == 0) {
-						printf("Got CMD0\n");
-						state = 0;
+						printf("Got CMD0 (GO_IDLE_STATE)\ncds=%d\n", cds);
+						CSR.CURRENT_STATE = 0;
 					} else if(cmdindex == 1) {
-						printf("Got CMD1\n");
-						state = 1;
-
-						uint64_t r3 = 0x3F40300000FF;
-						pinMode(20, OUTPUT);
-
-						bits = 0;
-						while(bits != 48) { 
-							int gpioreg = *(gpio + 13);
-							int clk = (gpioreg & (1 << 21)) != 0;
-
-							if(!high && clk) { 
-								++hz;
-								high = 1;
-							} else if (high && !clk) {
-								high = 0;
-								int bit = (r3 & 0x800000000000) != 0;
-								r3 <<= 1;
-								++bits;
-								digitalWrite(20, bit);
-							}
-						}
-
-						pinMode(20, INPUT);
-						bits = 0;
-						printf("Sent R3\n");
+						printf("Got CMD1 (SEND_OP_COND)\n");
+						CSR.CURRENT_STATE = 1;
+						hz += send_r3();
+					} else if (cmdindex == 8) {
+						printf("Got CMD8 (SEND_IF_COND)\n");
+						uint64_t args = (word >> 8) & 0xFFFFFFFF;
+						printf("args = %#llx\n", args);
+						printf("Ignore, don't reply.\n");
+					} else if (cmdindex == 55) {
+						printf("Got CMD55 (APP_CMD)\n");
+						CSR.APP_CMD = 1;
+						hz += send_r1(55);
 					} else {
 						printf("Unknown command!\n");
 						printf("%#llx\n", word);
