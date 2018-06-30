@@ -626,6 +626,8 @@ reset:
 	pullUpDnControl(21, PUD_OFF);
 	pullUpDnControl(26, PUD_UP);
 
+	// clock
+	clock_high = 0;
 	// cmd
 	uint64_t word = 0;
 	int bits = 0;
@@ -749,6 +751,17 @@ reset:
 							CSR.ILLEGAL_COMMAND = 0;
 						}
 
+					} else if (cmdindex == 16) {
+						printf("Got CMD16 (SET_BLOCKLEN)\n");
+						if (CSR.CURRENT_STATE == STATE_TRAN) {
+							CSR.APP_CMD = 0;
+
+							uint32_t arg = (uint32_t)(word >> 8);
+							printf("%#u\n", arg);
+							hz += send_r1(16);
+
+							CSR.ILLEGAL_COMMAND = 0;
+						}
 					} else if (cmdindex == 55) {
 						printf("Got CMD55 (APP_CMD)\n");
 						uint16_t rca = (word >> (8 + 16));
