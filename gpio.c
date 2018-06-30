@@ -696,6 +696,25 @@ reset:
 							hz += send_r6();
 							CSR.ILLEGAL_COMMAND = 0;
 						}
+					} else if (cmdindex == 7) {
+						CSR.APP_CMD = 0;
+
+						printf("Got CMD7 (SELECT_CARD)\n");
+						uint16_t rca = (word >> (8 + 16));
+						printf("RCA = %"PRIu16"\n", rca);
+
+						if(rca == RCA) {
+							if (CSR.CURRENT_STATE == 3) {
+								CSR.APP_CMD = 0;
+								CSR.CURRENT_STATE = 4;
+								hz += send_r1(7);
+								CSR.ILLEGAL_COMMAND = 0;
+							} else {
+								CSR.ILLEGAL_COMMAND = 1;
+							}
+						} else {
+							CSR.CURRENT_STATE = 3;
+						}
 					} else if (cmdindex == 8) {
 						CSR.APP_CMD = 0;
 
