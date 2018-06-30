@@ -537,6 +537,7 @@ uint64_t send_r3(int ccs, int busy) {
 
 uint64_t send_r6() {
 	RCA = (uint16_t)(rand() + 1);
+	printf("Set RCA to %hu\n", RCA);
 
 	// 00000011 = 0x03
 	uint64_t response = (uint64_t)0x03 << 32;
@@ -650,6 +651,7 @@ reset:
 					if (CSR.APP_CMD && cmdindex == 41) {
 						printf("Got ACMD41 (SD_SEND_OP_COND)\n");
 						if (CSR.CURRENT_STATE != 0) {
+							printf("Illegal command, in state %llu\n", CSR.CURRENT_STATE);
 							CSR.ILLEGAL_COMMAND = 1;
 						} else {
 							printf("%#llx\n", (word >> 8) & 0xFFFFFFFF);
