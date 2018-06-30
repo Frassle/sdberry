@@ -439,6 +439,15 @@ int main(int argc, char **argv)
 	generateCRCTable();
 	setup_io();
 
+	printf("Tests\n");
+
+	// 0100000000000000000000000000000000000000 = 1001010
+	printf("crc7(%#llx) = %#x = %#x\n", 0x4000000000, crc7(0x4000000000), 0x4A);
+	// 0101000100000000000000000000000000000000 = 0101010
+	printf("crc7(%#llx) = %#x = %#x\n", 0x5100000000, crc7(0x5100000000), 0x2A);
+	// 0001000100000000000000000000100100000000 = 0110011
+	printf("crc7(%#llx) = %#x = %#x\n", 0x1100000900, crc7(0x1100000900), 0x33);
+
 	printf("Raspberry Pi SD Card\n");
 	hiPri(99);
 
