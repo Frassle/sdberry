@@ -497,6 +497,7 @@ reset:
 				++bits;
 
 				if(bits == 48 && checkcrc(word)) {
+					pinMode(20, OUTPUT);
 					int cmdindex = (word >> 40) & 0x3F;
 
 					// Application commands
