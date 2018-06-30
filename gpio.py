@@ -18,19 +18,21 @@ import gpiozero
 
 
 with \
-    gpiozero.InputDevice(19) as miso, \
-    gpiozero.InputDevice(20) as mosi, \
-    gpiozero.InputDevice(21) as sckl, \
-    gpiozero.InputDevice(26) as cd, \
+    gpiozero.InputDevice(16) as pin16, \
+    gpiozero.InputDevice(19) as pin19, \
+    gpiozero.InputDevice(20) as pin20, \
+    gpiozero.InputDevice(21) as pin21, \
+    gpiozero.InputDevice(26) as pin26,\
     gpiozero.OutputDevice(3) as pinout:
 
     pinout.on()
 
     while True:
-        print("miso:mosi:sckl:cd")
-        print("{}   :{}   :{}   :{}".format(
-            1 if miso.value else 0,
-            1 if mosi.value else 0,
-            1 if sckl.value else 0,
-            1 if cd.value else 0))
+        print("16:19:20:21:26")
+        print("{} :{} :{} :{} :{}".format(
+            1 if pin16.value else 0,
+            1 if pin19.value else 0,
+            1 if pin20.value else 0,
+            1 if pin21.value else 0,
+            1 if pin26.value else 0))
         time.sleep(0.5)
