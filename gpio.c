@@ -392,7 +392,7 @@ int checkcrc(uint64_t word) {
 }
 
 void setupCID() {
-	memset(&CID, sizeof(CID), 0);
+	memset(&CID, 0, sizeof(CID));
 
 	// July 2018
 	CID.MDT = (18 << 4) | 6;
@@ -415,11 +415,11 @@ void setupCID() {
 }
 
 void setupCSR() {
-	memset(&CSR, sizeof(CSR), 0);
+	memset(&CSR, 0, sizeof(CSR));
 }
 
 void setupCSD() {
-	memset(&CSDV2, sizeof(CSDV2), 0);
+	memset(&CSDV2, 0, sizeof(CSDV2));
 
 	CSDV2.CSD_STRUCTURE = 1;
 	CSDV2.TAAC = 0x0E;
