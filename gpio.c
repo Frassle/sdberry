@@ -432,13 +432,6 @@ uint64_t send_r7(uint32_t voltage, uint32_t pattern) {
 
 int main(int argc, char **argv)
 {
-	// Clock tracker
-	int begin = -1;
-	uint64_t hz = 0;
-
-	generateCRCTable();
-	setup_io();
-
 	printf("Tests\n");
 
 	// 0100000000000000000000000000000000000000 = 1001010
@@ -450,6 +443,12 @@ int main(int argc, char **argv)
 
 	printf("Raspberry Pi SD Card\n");
 	hiPri(99);
+	generateCRCTable();
+	setup_io();
+
+	// Clock tracker
+	int begin = -1;
+	uint64_t hz = 0;
 
 reset:
 	setupCID();
