@@ -203,6 +203,9 @@ void pullUpDnControl (int pin, int pud) {
 // END OF GPIO, START OF SDCARD
 // ============================
 
+// Cross method clock high flag
+int clock_high = 0;
+
 // Relative Card Address register
 uint16_t RCA = 0;
 
@@ -330,17 +333,16 @@ uint64_t wait_clocks(int wait) {
 	digitalWrite(20, 1);
 
 	uint64_t hz = 0;
-	int high = 0;
 	while(wait > 0) { 
 		int gpioreg = *(gpio + 13);
 		int clk = (gpioreg & (1 << 21)) != 0;
 
-		if(!high && clk) { 
+		if(!clock_high && clk) { 
 			++hz;
-			high = 1;
+			clock_high = 1;
 			--wait;
-		} else if (high && !clk) {
-			high = 0;
+		} else if (clock_high && !clk) {
+			clock_high = 0;
 		}
 	}
 	return hz;
@@ -350,16 +352,15 @@ uint64_t wait_clocks(int wait) {
 uint64_t send_r(uint64_t response, uint64_t bits) {
 	uint64_t hz = 0;
 	uint64_t mask = (1LL << (bits - 1));
-	int high = 1;
 	while(bits > 0) { 
 		int gpioreg = *(gpio + 13);
 		int clk = (gpioreg & (1 << 21)) != 0;
 
-		if(!high && clk) { 
+		if(!clock_high && clk) { 
 			++hz;
-			high = 1;
-		} else if (high && !clk) {
-			high = 0;
+			clock_high = 1;
+		} else if (clock_high && !clk) {
+			clock_high = 0;
 			int bit = (response & mask) != 0;
 			digitalWrite(20, bit);
 			response <<= 1;
@@ -469,8 +470,6 @@ reset:
 	pullUpDnControl(21, PUD_OFF);
 	pullUpDnControl(26, PUD_UP);
 
-	// clock
-	int high = 0;
 	// cmd
 	uint64_t word = 0;
 	int bits = 0;
@@ -487,10 +486,10 @@ reset:
 			goto reset;
 		}
 
-		if (!high && clk) {
+		if (!clock_high && clk) {
 			if (begin == -1) { begin = micros(); }
 			++hz;
-			high = 1;
+			clock_high = 1;
 
 			if (start) {
 				word <<= 1;
@@ -570,8 +569,8 @@ reset:
 				}
 			}
 
-		} else if (high && !clk) {
-			high = 0;
+		} else if (clock_high && !clk) {
+			clock_high = 0;
 		}
 	}
 
