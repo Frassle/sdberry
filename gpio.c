@@ -502,9 +502,10 @@ reset:
 					// Application commands
 					if (CSR.APP_CMD && cmdindex == 41) {
 						printf("Got ACMD41 (SD_SEND_OP_COND)\n");
+						printf("%#llx\n", (word >> 8) & 0xFFFFFFFF);
 						// Just gonna assume requested features/voltage are ok.
 						CSR.CURRENT_STATE = 1;
-					//	hz += send_r3(1, 1);
+						hz += send_r3(1, 1);
 
 						CSR.APP_CMD = 0;
 					} 
