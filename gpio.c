@@ -425,7 +425,7 @@ void setupCSD() {
 	CSDV2.TAAC = 0x0E;
 	CSDV2.NSAC = 0;
 	CSDV2.TRAN_SPEED = 0x32;
-	CSDV2.CCC = 0x1;
+	CSDV2.CCC = 0x35;
 	CSDV2.READ_BL_LEN = 0x9;
 	CSDV2.READ_BL_PARTIAL = 0;
 	CSDV2.WRITE_BLK_MISALIGN = 0;
@@ -470,7 +470,6 @@ uint64_t wait_clocks(int wait) {
 	}
 	return hz;
 }
-
 
 uint64_t send_r(uint64_t response, uint64_t bits) {
 	uint64_t hz = 0;
