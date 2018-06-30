@@ -210,6 +210,15 @@ int clock_high = 0;
 uint16_t RCA = 0;
 
 // Card status register
+#define STATE_IDLE 0
+#define STATE_READY 1
+#define STATE_IDENT 2
+#define STATE_STBY 3
+#define STATE_TRAN 4
+#define STATE_DATA 5
+#define STATE_RCV 6
+#define STATE_PRG 7
+#define STATE_DIS 8
 struct {
 	uint32_t reserved6 : 2;
 	uint32_t reserved5 : 1;
@@ -650,13 +659,13 @@ reset:
 					// Application commands
 					if (CSR.APP_CMD && cmdindex == 41) {
 						printf("Got ACMD41 (SD_SEND_OP_COND)\n");
-						if (CSR.CURRENT_STATE != 0) {
+						if (CSR.CURRENT_STATE != STATE_IDLE) {
 							printf("Illegal command, in state %llu\n", CSR.CURRENT_STATE);
 							CSR.ILLEGAL_COMMAND = 1;
 						} else {
 							printf("%#llx\n", (word >> 8) & 0xFFFFFFFF);
 							// Just gonna assume requested features/voltage are ok.
-							CSR.CURRENT_STATE = 1;
+							CSR.CURRENT_STATE = STATE_READY;
 							hz += send_r3(1, 1);
 
 							CSR.APP_CMD = 0;
@@ -675,11 +684,11 @@ reset:
 					} else if (cmdindex == 2) {
 						printf("Got CMD2 (ALL_SEND_CID)\n");
 
-						if (CSR.CURRENT_STATE != 1) { 
+						if (CSR.CURRENT_STATE != STATE_READY) { 
 							CSR.ILLEGAL_COMMAND = 1;
 						} else {
 							CSR.APP_CMD = 0;
-							CSR.CURRENT_STATE = 2;
+							CSR.CURRENT_STATE = STATE_IDENT;
 
 							hz += send_r2((uint64_t*)&CID);
 
@@ -688,11 +697,11 @@ reset:
 					} else if (cmdindex == 3) {
 						printf("Got CMD3 (SEND_RELATIVE_ADDR)\n");
 
-						if (CSR.CURRENT_STATE != 2) { 
+						if (CSR.CURRENT_STATE != STATE_IDENT) { 
 							CSR.ILLEGAL_COMMAND = 1;
 						} else {
 							CSR.APP_CMD = 0;
-							CSR.CURRENT_STATE = 3;
+							CSR.CURRENT_STATE = STATE_STBY;
 							hz += send_r6();
 							CSR.ILLEGAL_COMMAND = 0;
 						}
@@ -704,16 +713,16 @@ reset:
 						printf("RCA = %"PRIu16"\n", rca);
 
 						if(rca == RCA) {
-							if (CSR.CURRENT_STATE == 3) {
+							if (CSR.CURRENT_STATE == STATE_STBY) {
 								CSR.APP_CMD = 0;
-								CSR.CURRENT_STATE = 4;
+								CSR.CURRENT_STATE = STATE_TRAN;
 								hz += send_r1(7);
 								CSR.ILLEGAL_COMMAND = 0;
 							} else {
 								CSR.ILLEGAL_COMMAND = 1;
 							}
 						} else {
-							CSR.CURRENT_STATE = 3;
+							CSR.CURRENT_STATE = STATE_STBY;
 						}
 					} else if (cmdindex == 8) {
 						CSR.APP_CMD = 0;
