@@ -531,12 +531,11 @@ reset:
 						uint64_t pattern = (word >> 8) & 0xFF;
 						printf("voltage = %#llx\n", voltage);
 						printf("pattern = %#llx\n", pattern);
-						printf("Don't reply to CMD8, only version 1.0 for now\n");
-						//if (voltage == 1) {
-						//	hz += send_r7(voltage, pattern);
-						//} else {
-						//	printf("voltage invalid, not responding\n");
-						//}
+						if (voltage == 1) {
+							hz += send_r7(voltage, pattern);
+						} else {
+							printf("voltage invalid, not responding\n");
+						}
 					} else if (cmdindex == 55) {
 						printf("Got CMD55 (APP_CMD)\n");
 						uint16_t rca = (word >> (8 + 16));
