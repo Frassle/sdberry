@@ -674,6 +674,21 @@ reset:
 							CSR.ILLEGAL_COMMAND = 0;
 						}
 					} 
+					else if(CSR.APP_CMD && cmdindex == 42) {
+						printf("Got ACMD42 (SET_CLR_CARD_DETECT)\n");
+						if (CSR.CURRENT_STATE == STATE_TRAN) {
+
+							if(word & 0x100) {
+								pullUpDnControl(26, PUD_UP);
+							} else {
+								pullUpDnControl(26, PUD_OFF);
+							}
+							hz += send_r1(42);
+
+							CSR.APP_CMD = 0;
+							CSR.ILLEGAL_COMMAND = 0;
+						}
+					}
 					
 					// Normal commands	
 					else if (cmdindex == 0) {
