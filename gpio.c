@@ -545,6 +545,9 @@ int main(int argc, char **argv)
 						printf("%#llx\n", word);
 						break;
 					}
+					
+					// Clear errors	
+					CSR.COM_CRC_ERROR = 0;
 
 					pinMode(20, INPUT);
 					start = 0;
