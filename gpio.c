@@ -203,8 +203,11 @@ void pullUpDnControl (int pin, int pud) {
 // END OF GPIO, START OF SDCARD
 // ============================
 
+// Relative Card Address register
+uint16_t RCA = 0;
+
 // Card status register
-typedef struct CSR_WORD {
+struct {
 	uint32_t reserved6 : 2;
 	uint32_t reserved5 : 1;
 	uint32_t AKE_SEQ_ERROR : 1;
@@ -242,9 +245,7 @@ typedef struct CSR_WORD {
 	uint32_t BLOCK_LEN_ERROR : 1;
 	uint32_t ADDRESS_ERROR : 1;
 	uint32_t OUT_OF_RANGE : 1;
-} CSR_WORD;
-
-CSR_WORD CSR;
+} CSR;
 
 // Card IDentification register
 struct {
@@ -348,7 +349,7 @@ uint64_t wait_clocks(int wait) {
 
 uint64_t send_r(uint64_t response, uint64_t bits) {
 	uint64_t hz = 0;
-	uint64_t mask = (1 << (bits - 1));
+	uint64_t mask = (1LL << (bits - 1));
 	int high = 1;
 	while(bits > 0) { 
 		int gpioreg = *(gpio + 13);
@@ -371,7 +372,7 @@ uint64_t send_r(uint64_t response, uint64_t bits) {
 uint64_t send_r1(int cmdindex) {
 	uint64_t hz = 0; //wait_clocks(2);
 
-	uint64_t response = (uint64_t)cmdindex << 32;
+	uint64_t response = (uint64_t)cmdindex << (40 - 8);
 	response |= *((uint32_t*)&CSR);
 	uint8_t crc = crc7(response);
 	response <<= 8;
@@ -503,15 +504,22 @@ int main(int argc, char **argv)
 					
 					// Normal commands	
 					else if (cmdindex == 0) {
+						CSR.APP_CMD = 0;
 						printf("Got CMD0 (GO_IDLE_STATE)\ncds=%d\n", cds);
 						CSR.CURRENT_STATE = 0;
 					} else if (cmdindex == 1) {
+						CSR.APP_CMD = 0;
+
 						printf("Got CMD1 (SEND_OP_COND)\n");
 						printf("Don't reply to CMD1, not an MMC card\n");
 					} else if (cmdindex == 2) {
+						CSR.APP_CMD = 0;
+
 						printf("Got CMD2 (ALL_SEND_CID)\n");
 					//	hz += send_r2((uint64_t*)&CID);
 					} else if (cmdindex == 8) {
+						CSR.APP_CMD = 0;
+
 						printf("Got CMD8 (SEND_IF_COND)\n");
 						uint64_t voltage = (word >> 16) & 0xF;
 						uint64_t pattern = (word >> 8) & 0xFF;
@@ -525,7 +533,13 @@ int main(int argc, char **argv)
 						//}
 					} else if (cmdindex == 55) {
 						printf("Got CMD55 (APP_CMD)\n");
-					//	hz += send_r1(55);
+						uint16_t rca = (word >> (8 + 16));
+						printf("RCA = %"PRIu16"\n", rca);
+
+						if(rca == RCA) {
+							CSR.APP_CMD = 1;
+							hz += send_r1(55);
+						}
 					} else {
 						printf("Unknown command!\n");
 						printf("%#llx\n", word);
