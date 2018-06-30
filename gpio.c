@@ -266,6 +266,79 @@ struct {
 	uint64_t MID : 8;
 } CID;
 
+// Card-Specific Data register
+struct {
+	uint64_t not_used : 1;
+	uint64_t CRC : 7;
+	uint64_t reserved1 : 2;
+	uint64_t FILE_FORMAT : 2;
+	uint64_t TMP_WRITE_PROTECT : 1;
+	uint64_t PERM_WRITE_PROTECT : 1;
+	uint64_t COPY : 1;
+	uint64_t FILE_FORMAT_GRP : 1;
+	uint64_t reserved2 : 5;
+	uint64_t WRITE_BL_PARTIAL : 1;
+	uint64_t WRITE_BL_LEN : 4;
+	uint64_t R2W_FACTOR : 3;
+	uint64_t reserved3 : 2;
+	uint64_t WP_GRP_ENABLE : 1;
+	uint64_t WP_GRP_SIZE : 7;
+	uint64_t SECTOR_SIZE : 7;
+	uint64_t ERASE_BLK_EN : 1;
+	uint64_t C_SIZE_MULT : 3;
+	uint64_t VDD_W_CURR_MAX : 3;
+	uint64_t VDD_W_CURR_MIN : 3;
+	uint64_t VDD_R_CURR_MAX : 3;
+	uint64_t VDD_R_CURR_MIN : 3;
+	uint64_t C_SIZE : 12;
+	uint64_t reserved4 : 2;
+	uint64_t DSR_IMP : 1;
+	uint64_t READ_BLK_MISALIGN : 1;
+	uint64_t WRITE_BLK_MISALIGN : 1;
+	uint64_t READ_BL_PARTIAL : 1;
+	uint64_t READ_BL_LEN : 4;
+	uint64_t CCC : 12;
+	uint64_t TRAN_SPEED : 8;
+	uint64_t NSAC : 8;
+	uint64_t TAAC : 8;
+	uint64_t reserved5 : 6;
+	uint64_t CSD_STRUCTURE : 2;
+} CSDV1;
+
+struct {
+	uint64_t not_used : 1;
+	uint64_t CRC : 7;
+	uint64_t reserved1 : 2;
+	uint64_t FILE_FORMAT : 2;
+	uint64_t TMP_WRITE_PROTECT : 1;
+	uint64_t PERM_WRITE_PROTECT : 1;
+	uint64_t COPY : 1;
+	uint64_t FILE_FORMAT_GRP : 1;
+	uint64_t reserved2 : 5;
+	uint64_t WRITE_BL_PARTIAL : 1;
+	uint64_t WRITE_BL_LEN : 4;
+	uint64_t R2W_FACTOR : 3;
+	uint64_t reserved3 : 2;
+	uint64_t WP_GRP_ENABLE : 1;
+	uint64_t WP_GRP_SIZE : 7;
+	uint64_t SECTOR_SIZE : 7;
+	uint64_t ERASE_BLK_EN : 1;
+	uint64_t reserved4 : 1;
+	uint64_t C_SIZE : 22;
+	uint64_t reserved5 : 6;
+	uint64_t DSR_IMP : 1;
+	uint64_t READ_BLK_MISALIGN : 1;
+	uint64_t WRITE_BLK_MISALIGN : 1;
+	uint64_t READ_BL_PARTIAL : 1;
+	uint64_t READ_BL_LEN : 4;
+	uint64_t CCC : 12;
+	uint64_t TRAN_SPEED : 8;
+	uint64_t NSAC : 8;
+	uint64_t TAAC : 8;
+	uint64_t reserved6 : 6;
+	uint64_t CSD_STRUCTURE : 2;
+} CSDV2;
+
 uint8_t CRCTable[256];
  
 void generateCRCTable()
@@ -344,6 +417,39 @@ void setupCID() {
 void setupCSR() {
 	memset(&CSR, sizeof(CSR), 0);
 }
+
+void setupCSD() {
+	memset(&CSDV2, sizeof(CSDV2), 0);
+
+	CSDV2.CSD_STRUCTURE = 1;
+	CSDV2.TAAC = 0x0E;
+	CSDV2.NSAC = 0;
+	CSDV2.TRAN_SPEED = 0x32;
+	CSDV2.CCC = 0x1;
+	CSDV2.READ_BL_LEN = 0x9;
+	CSDV2.READ_BL_PARTIAL = 0;
+	CSDV2.WRITE_BLK_MISALIGN = 0;
+	CSDV2.READ_BLK_MISALIGN = 0;
+	CSDV2.DSR_IMP = 0;
+	// About 1GB
+	CSDV2.C_SIZE = 1999;
+	CSDV2.ERASE_BLK_EN = 1;
+	CSDV2.SECTOR_SIZE = 0x7F;
+	CSDV2.WP_GRP_SIZE = 0;
+	CSDV2.WP_GRP_ENABLE = 0;
+	CSDV2.R2W_FACTOR = 2;
+	CSDV2.WRITE_BL_LEN = 0x9;
+	CSDV2.WRITE_BL_PARTIAL = 0;
+	CSDV2.FILE_FORMAT_GRP = 0;
+	CSDV2.COPY = 0;
+	CSDV2.PERM_WRITE_PROTECT = 0;
+	CSDV2.TMP_WRITE_PROTECT = 0;
+	CSDV2.FILE_FORMAT = 0;
+
+	uint8_t crc = crc7_bytes(((uint8_t*)&CSDV2) + 1, 15);
+	CSDV2.CRC = crc;
+}
+
 
 uint64_t wait_clocks(int wait) {
 	pinMode(20, OUTPUT);
@@ -495,6 +601,7 @@ reset:
 	RCA = 0;
 	setupCID();
 	setupCSR();
+	setupCSD();
 
 	pinMode(16, INPUT);
 	pinMode(19, OUTPUT);
@@ -601,6 +708,17 @@ reset:
 							printf("voltage invalid, not responding\n");
 						}
 						CSR.ILLEGAL_COMMAND = 0;
+					} else if (cmdindex == 9) {
+						printf("Got CMD9  (SEND_CSD)\n");
+						uint16_t rca = (word >> (8 + 16));
+						printf("RCA = %"PRIu16"\n", rca);
+
+						if(rca == RCA) {
+							CSR.APP_CMD = 0;
+							hz += send_r2((uint64_t*)&CSDV2);
+							CSR.ILLEGAL_COMMAND = 0;
+						}
+
 					} else if (cmdindex == 55) {
 						printf("Got CMD55 (APP_CMD)\n");
 						uint16_t rca = (word >> (8 + 16));
