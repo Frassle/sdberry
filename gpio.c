@@ -4,15 +4,16 @@
 #define GPIO_BASE                (BCM2708_PERI_BASE + 0x200000) /* GPIO controller */
 
 
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sched.h>
 #include <time.h>
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <unistd.h>
-#include <wiringPi.h>
 
 #define BLOCK_SIZE (4*1024)
 
@@ -22,18 +23,34 @@ void *gpio_map;
 // I/O access
 volatile unsigned *gpio;
 
-/*
- * micros:
- *      Return a number of microseconds as an unsigned int.
- *      Wraps after 71 minutes.
- *********************************************************************************
- */
+int hiPri (const int pri)
+{
+	struct sched_param sched ;
+	memset (&sched, 0, sizeof(sched)) ;
+
+	if (pri > sched_get_priority_max (SCHED_RR)) {
+		sched.sched_priority = sched_get_priority_max (SCHED_RR);
+	} else {
+		sched.sched_priority = pri;
+	}
+
+	return sched_setscheduler (0, SCHED_RR, &sched);
+}
+
 unsigned int micros (void)
 {
-  struct timespec ts ;
-  clock_gettime (CLOCK_MONOTONIC_RAW, &ts) ;
-  uint64_t now  = (uint64_t)ts.tv_sec * (uint64_t)1000000 + (uint64_t)(ts.tv_nsec / 1000) ;
-  return (uint32_t)now;
+	struct timespec ts ;
+	clock_gettime (CLOCK_MONOTONIC_RAW, &ts) ;
+	uint64_t now  = (uint64_t)ts.tv_sec * (uint64_t)1000000 + (uint64_t)(ts.tv_nsec / 1000) ;
+	return (uint32_t)now;
+}
+
+void delayMicroseconds (unsigned int howLong)
+{
+	unsigned int deadline = micros() + howLong;
+	while(micros() <= deadline) {
+
+	}
 }
 
 //
@@ -420,7 +437,7 @@ int main(int argc, char **argv)
 	setup_io();
 
 	printf("Raspberry Pi SD Card\n");
-	piHiPri(99);
+	hiPri(99);
 
 	pinMode(16, INPUT);
 	pinMode(19, OUTPUT);
