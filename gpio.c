@@ -727,8 +727,8 @@ reset:
 						if(rca == RCA) {
 							CSR.APP_CMD = 1;
 							hz += send_r1(55);
+							CSR.ILLEGAL_COMMAND = 0;
 						}
-						CSR.ILLEGAL_COMMAND = 0;
 					} else {
 						printf("Unknown command!\n");
 						printf("%#llx\n", word);
