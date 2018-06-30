@@ -432,13 +432,19 @@ uint64_t send_r7(uint32_t voltage, uint32_t pattern) {
 
 int main(int argc, char **argv)
 {
+	// Clock tracker
+	int begin = -1;
+	uint64_t hz = 0;
+
 	generateCRCTable();
-	setupCID();
-	setupCSR();
 	setup_io();
 
 	printf("Raspberry Pi SD Card\n");
 	hiPri(99);
+
+reset:
+	setupCID();
+	setupCSR();
 
 	pinMode(16, INPUT);
 	pinMode(19, OUTPUT);
@@ -455,9 +461,6 @@ int main(int argc, char **argv)
 
 	// clock
 	int high = 0;
-	uint64_t hz = 0;
-	int begin = -1;
-
 	// cmd
 	uint64_t word = 0;
 	int bits = 0;
@@ -471,12 +474,7 @@ int main(int argc, char **argv)
 		int cds = (gpioreg & (1 << 26)) != 0;
 
 		if (!power) {
-			high = 0;
-			word = 0;
-			bits = 0;
-			start = 0;
-			memset(&CSR, sizeof(CSR), 0);
-			continue;
+			goto reset;
 		}
 
 		if (!high && clk) {
@@ -504,9 +502,8 @@ int main(int argc, char **argv)
 					
 					// Normal commands	
 					else if (cmdindex == 0) {
-						CSR.APP_CMD = 0;
 						printf("Got CMD0 (GO_IDLE_STATE)\ncds=%d\n", cds);
-						CSR.CURRENT_STATE = 0;
+						goto reset;
 					} else if (cmdindex == 1) {
 						CSR.APP_CMD = 0;
 
