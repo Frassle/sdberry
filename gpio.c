@@ -432,18 +432,20 @@ uint64_t send_r7(uint32_t voltage, uint32_t pattern) {
 
 int main(int argc, char **argv)
 {
+	generateCRCTable();
 	printf("Tests\n");
 
 	// 0100000000000000000000000000000000000000 = 1001010
-	printf("crc7(%#llx) = %#x = %#x\n", 0x4000000000, crc7(0x4000000000), 0x4A);
+	printf("crc7(%#llx) = %#hhx = %#x\n", 0x4000000000, crc7(0x4000000000), 0x4A);
+	uint64_t test = 0x4000000000;
+	printf("crc7_bytes(%#llx) = %#hhx = %#x\n", 0x4000000000, crc7_bytes((uint8_t*)&test, 5), 0x4A);
 	// 0101000100000000000000000000000000000000 = 0101010
-	printf("crc7(%#llx) = %#x = %#x\n", 0x5100000000, crc7(0x5100000000), 0x2A);
+	printf("crc7(%#llx) = %#hhx = %#x\n", 0x5100000000, crc7(0x5100000000), 0x2A);
 	// 0001000100000000000000000000100100000000 = 0110011
-	printf("crc7(%#llx) = %#x = %#x\n", 0x1100000900, crc7(0x1100000900), 0x33);
+	printf("crc7(%#llx) = %#hhx = %#x\n", 0x1100000900, crc7(0x1100000900), 0x33);
 
 	printf("Raspberry Pi SD Card\n");
 	hiPri(99);
-	generateCRCTable();
 	setup_io();
 
 	// Clock tracker
