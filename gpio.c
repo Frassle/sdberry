@@ -236,6 +236,7 @@ struct {
 	uint32_t CSD_OVERWRITE : 1;
 	uint32_t reserved2 : 1;
 	uint32_t reserved1 : 1;
+	uint32_t ERROR : 1;
 	uint32_t CC_ERROR : 1;
 	uint32_t CARD_ECC_FAILED : 1;
 	uint32_t ILLEGAL_COMMAND : 1;
@@ -428,6 +429,30 @@ uint64_t send_r3(int ccs, int busy) {
 	return hz;
 }
 
+uint64_t send_r6() {
+	RCA = (uint16_t)(rand() + 1);
+
+	// 00000011 = 0x03
+	uint64_t response = (uint64_t)0x03 << 32;
+	response |= ((uint64_t)RCA << 16);
+	response |= (CSR.COM_CRC_ERROR << 15);
+	response |= (CSR.ILLEGAL_COMMAND << 14);
+	response |= (CSR.ERROR << 13);
+	response |= (CSR.CURRENT_STATE << 9);
+	response |= (CSR.READY_FOR_DATA << 8);
+	response |= (CSR.FX_EVENT << 6);
+	response |= (CSR.APP_CMD << 5);
+	response |= (CSR.AKE_SEQ_ERROR << 3);
+
+	uint8_t crc = crc7(response);
+	response <<= 8;
+	response |= (crc << 1);
+	response |= 1;
+	uint64_t hz = send_r(response, 48);
+	printf("Sent R6 (%#llx)\n", response);
+	return hz;
+}
+
 uint64_t send_r7(uint32_t voltage, uint32_t pattern) {
 	uint64_t hz = 0; //wait_clocks(2);
 
@@ -467,6 +492,7 @@ int main(int argc, char **argv)
 	uint64_t hz = 0;
 
 reset:
+	RCA = 0;
 	setupCID();
 	setupCSR();
 
@@ -548,6 +574,17 @@ reset:
 
 							hz += send_r2((uint64_t*)&CID);
 
+							CSR.ILLEGAL_COMMAND = 0;
+						}
+					} else if (cmdindex == 3) {
+						printf("Got CMD3 (SEND_RELATIVE_ADDR)\n");
+
+						if (CSR.CURRENT_STATE != 2) { 
+							CSR.ILLEGAL_COMMAND = 1;
+						} else {
+							CSR.APP_CMD = 0;
+							CSR.CURRENT_STATE = 3;
+							hz += send_r6();
 							CSR.ILLEGAL_COMMAND = 0;
 						}
 					} else if (cmdindex == 8) {
