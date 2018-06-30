@@ -319,7 +319,23 @@ int checkcrc(uint64_t word) {
 
 void setupCID() {
 	memset(&CID, sizeof(CID), 0);
+
+	// July 2018
+	CID.MDT = (18 << 4) | 6;
+	CID.PSN = 0xDEADBEEF;
+	// 1.0
+	CID.PRV = (1 << 4);
+	CID.PNM = 
+		((uint64_t)'W' << (8 * 4)) |
+		((uint64_t)'y' << (8 * 3)) |
+		((uint64_t)'a' << (8 * 2)) |
+		((uint64_t)'t' << (8 * 1)) |
+		((uint64_t)'t' << (8 * 0));
+	CID.OID = 0x0;
+	// Pretend we're sandisk
+	CID.MID = 0x2;
 	CID.not_used = 1;
+
 	uint8_t crc = crc7_bytes(((uint8_t*)&CID) + 1, 15);
 	CID.CRC = crc;
 }
@@ -389,12 +405,9 @@ uint64_t send_r2(uint64_t *reg) {
 
 	// 00111111 = 0x3F
 	hz += send_r(0x3F, 8);
-
-	uint64_t response = *(reg + 1);
-	hz += send_r(response, 64);
-	response = *reg;
-	hz += send_r(response, 64);
-	printf("Sent R2 (%#llx%llx)\n", *(reg + 1), *reg);
+	hz += send_r(*(reg + 1), 64);
+	hz += send_r(*(reg), 64);
+	printf("Sent R2 (%#.16llx%.16llx)\n", *(reg + 1), *reg);
 	return hz;
 }
 
@@ -503,12 +516,17 @@ reset:
 					// Application commands
 					if (CSR.APP_CMD && cmdindex == 41) {
 						printf("Got ACMD41 (SD_SEND_OP_COND)\n");
-						printf("%#llx\n", (word >> 8) & 0xFFFFFFFF);
-						// Just gonna assume requested features/voltage are ok.
-						CSR.CURRENT_STATE = 1;
-						hz += send_r3(1, 1);
+						if (CSR.CURRENT_STATE != 0) {
+							CSR.ILLEGAL_COMMAND = 1;
+						} else {
+							printf("%#llx\n", (word >> 8) & 0xFFFFFFFF);
+							// Just gonna assume requested features/voltage are ok.
+							CSR.CURRENT_STATE = 1;
+							hz += send_r3(1, 1);
 
-						CSR.APP_CMD = 0;
+							CSR.APP_CMD = 0;
+							CSR.ILLEGAL_COMMAND = 0;
+						}
 					} 
 					
 					// Normal commands	
@@ -516,15 +534,22 @@ reset:
 						printf("Got CMD0 (GO_IDLE_STATE)\ncds=%d\n", cds);
 						goto reset;
 					} else if (cmdindex == 1) {
-						CSR.APP_CMD = 0;
-
+						CSR.ILLEGAL_COMMAND = 1;
 						printf("Got CMD1 (SEND_OP_COND)\n");
 						printf("Don't reply to CMD1, not an MMC card\n");
 					} else if (cmdindex == 2) {
-						CSR.APP_CMD = 0;
-
 						printf("Got CMD2 (ALL_SEND_CID)\n");
-					//	hz += send_r2((uint64_t*)&CID);
+
+						if (CSR.CURRENT_STATE != 1) { 
+							CSR.ILLEGAL_COMMAND = 1;
+						} else {
+							CSR.APP_CMD = 0;
+							CSR.CURRENT_STATE = 2;
+
+							hz += send_r2((uint64_t*)&CID);
+
+							CSR.ILLEGAL_COMMAND = 0;
+						}
 					} else if (cmdindex == 8) {
 						CSR.APP_CMD = 0;
 
@@ -538,6 +563,7 @@ reset:
 						} else {
 							printf("voltage invalid, not responding\n");
 						}
+						CSR.ILLEGAL_COMMAND = 0;
 					} else if (cmdindex == 55) {
 						printf("Got CMD55 (APP_CMD)\n");
 						uint16_t rca = (word >> (8 + 16));
@@ -547,13 +573,14 @@ reset:
 							CSR.APP_CMD = 1;
 							hz += send_r1(55);
 						}
+						CSR.ILLEGAL_COMMAND = 0;
 					} else {
 						printf("Unknown command!\n");
 						printf("%#llx\n", word);
 						break;
 					}
 					
-					// Clear errors	
+					// Clear crc error
 					CSR.COM_CRC_ERROR = 0;
 
 					pinMode(20, INPUT);
