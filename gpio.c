@@ -424,7 +424,7 @@ void setupCSD() {
 	CSDV2.CSD_STRUCTURE = 1;
 	CSDV2.TAAC = 0x0E;
 	CSDV2.NSAC = 0;
-	CSDV2.TRAN_SPEED = 0x32;
+	CSDV2.TRAN_SPEED = 0x8; // Try 0x8 for 1kbit/s, should be 0x32 for 25Mbit/s;
 	CSDV2.CCC = 0x35;
 	CSDV2.READ_BL_LEN = 0x9;
 	CSDV2.READ_BL_PARTIAL = 0;
