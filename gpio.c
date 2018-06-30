@@ -445,6 +445,7 @@ void setupCSD() {
 	CSDV2.PERM_WRITE_PROTECT = 0;
 	CSDV2.TMP_WRITE_PROTECT = 0;
 	CSDV2.FILE_FORMAT = 0;
+	CSDV2.not_used = 1;
 
 	uint8_t crc = crc7_bytes(((uint8_t*)&CSDV2) + 1, 15);
 	CSDV2.CRC = crc;
